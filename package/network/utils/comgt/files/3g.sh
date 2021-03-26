@@ -95,6 +95,16 @@ proto_3g_setup() {
 		nopcomp \
 		novj \
 		nobsdcomp \
+		noipdefault \
+		noccp \
+		novjccomp \
+		ipcp-accept-local \
+		ipcp-accept-remote \
+		local \
+		persist \
+		dump \
+		nodetach \
+		nocrtscts \
 		noauth \
 		lock \
 		crtscts \
