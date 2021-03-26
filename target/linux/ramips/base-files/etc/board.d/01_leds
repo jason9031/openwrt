@@ -249,6 +249,7 @@ case $board in
 		;;
 	XiaoYin)
 		ucidef_set_led_default "power" "power" "sys" "0"
+		ucidef_set_led_netdev "lan" "lan" "lan" "eth0.1"
 		ucidef_set_led_netdev "wan" "wan" "wan" "eth0.2"
 		set_wifi_led "wifi"
 		;;

@@ -68,6 +68,20 @@ delete network.wan6
 set network.wan6='interface'
 set network.wan6.ifname='$ifname'
 set network.wan6.proto='dhcpv6'
+
+add_list firewall.@zone[1].network="wwan"
+set wireless.ap.ssid=YunYin_`hexdump -C /dev/mtd2 | head -1 | awk '{print $9$10$11}'|tr a-z A-Z`
+EOF
+		;;
+		ppp) uci -q batch <<EOF
+set network.ppp='interface'
+set network.ppp.ifname='$ifname'
+set network.ppp.proto='3g'
+set network.ppp.apn='cmnet'
+set network.ppp.service='umts'
+set network.ppp.dialnumber='*99#'
+set network.ppp.device='/dev/ttyUSB2'
+set network.ppp.auto='0'
 EOF
 		;;
 	esac

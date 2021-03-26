@@ -12,13 +12,14 @@
 
 	memory@0 {
 		device_type = "memory";
-		reg = <0x0 0x8000000>;
+		//reg = <0x0 0x4000000>;
+		reg = <0x0 0x8000000>; //128MB
 	};
 
 	pinctrl {
 		state_default: pinctrl0 {
 			gpio {
-				ralink,group = "gpio","perst", "refclk","spis","wled_an","ephy_p0","ephy_p1","ephy_p2","ephy_p3","ephy_p4","wdt";
+				ralink,group = "i2s","gpio","perst", "refclk","spis","wled_an","p0_led_an","p1_led_an","p2_led_an","p3_led_an","p4_led_an","wdt","i2c";
 				ralink,function = "gpio";
 			};
 			
@@ -36,11 +37,6 @@
 				ralink,group = "uart0";
 				ralink,function = "uart0";
 			};
-			
-			i2c {
-				ralink,group = "i2c";
-				ralink,function = "i2c";
-			};
 		};
 	};
 
@@ -54,9 +50,9 @@
 			m25p80@0 {
 				#address-cells = <1>;
 				#size-cells = <1>;
-				compatible = "w25q256";
+				compatible = "w25q128";
 				reg = <0 0>;
-				linux,modalias = "m25p80", "w25q256";
+				linux,modalias = "m25p80", "w25q128";
 				spi-max-frequency = <40000000>;
 				m25p,chunked-io = <31>;
 
@@ -78,7 +74,9 @@
 
 				partition@50000 {
 					label = "firmware";
-					reg = <0x50000 0x1fb0000>; 
+					//reg = <0x50000 0x07b0000>; //8MB
+					//reg = <0x50000 0x0fb0000>; //16MB
+					reg = <0x50000 0x1fb0000>; //32MB
 				};
 			};
 
@@ -89,10 +87,6 @@
 				reg = <1 0>;
 				spi-max-frequency = <40000000>;
 			};
-		};
-
-		i2c@900 {
-			status = "okay";
 		};
 
 		uart1@d00 {
@@ -108,6 +102,11 @@
 		};
 	};
 
+	sdhci@10130000 {
+		status = "disabled";
+		mediatek,cd-low;
+	};
+	
 	ethernet@10100000 {
 		mtd-mac-address = <&factory 0x28>;
 	};
@@ -134,8 +133,8 @@
 			default-state = "off";
 		};
 
-		zpower {
-			label = "zpower";
+		lan {
+			label = "lan";
 			gpios = <&gpio1 10 0>;
 			default-state = "off";
 		};

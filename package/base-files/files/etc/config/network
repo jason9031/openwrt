@@ -13,6 +13,8 @@ config interface lan
 	option ipaddr	192.168.121.1
 	option netmask	255.255.255.0
 	option ip6assign 60
-
+config interface wan
+	option ifname	apcli0
+	option proto	dhcp
 config globals globals
 	option ula_prefix auto

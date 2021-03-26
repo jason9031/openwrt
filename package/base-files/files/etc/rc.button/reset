@@ -3,17 +3,28 @@
 [ "${ACTION}" = "released" ] || exit 0
 
 . /lib/functions.sh
+. /lib/functions/leds.sh
 
 logger "$BUTTON pressed for $SEEN seconds"
 
 if [ "$SEEN" -lt 1 ]
 then
 	echo "REBOOT" > /dev/console
+	led_off "sys" #关闭系统指示灯
+	led_on "wifi" #关闭WIFI指示灯
+	led_off "zpower" #关闭ZIGBEE电源
 	sync
-	reboot
+	reboot -f
 elif [ "$SEEN" -gt 5 ]
 then
 	echo "FACTORY RESET" > /dev/console
+	led_timer "sys" 50 50  #系统灯闪烁
+	led_on "wifi" #关闭WIFI指示灯
+	
+	zigbee=`/usr/bin/pgrep  fszigbeegw` 
+	/bin/kill  -USR1 $zigbee
+	sleep 3
+	
 	jffs2reset -y && reboot &
 fi
 

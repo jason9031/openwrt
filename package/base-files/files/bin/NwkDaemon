@@ -1,0 +1,280 @@
+#!/bin/sh 
+##网络状态检测
+
+CFG=/etc/board.json
+
+. /usr/share/libubox/jshn.sh
+
+dns1="223.5.5.5"            #aliyun dns
+dns2="223.6.6.6"            #aliyun dns
+
+readonly url="www.baidu.com"
+readonly wName="wireless"
+#wireless中ApCliSsid=aAP
+#readonly wAplic0DefName="aAP"
+readonly wAplic0DefName="UplinkAp"
+readonly wanPort="eth0.2"
+readonly apPort="apcli0"
+readonly networklog="/tmp/network.log"
+readonly maxsize=$((1024*1024))
+#网络连接模式 0:未知 1:WiFi桥接 2:网线
+wClientMode=0
+#networkPort=4
+retryCnt=0
+
+json_init
+json_load "$(cat ${CFG})"
+
+json_select switch
+json_select switch0
+json_select vlans
+json_select wan
+
+json_get_values networkPort
+
+json_select ..
+json_select ..
+json_select ..
+json_select ..
+
+isUsePPP=`cat ${CFG} | grep -w "ppp" | grep -v "grep"|wc -l `
+
+if [ -d /sys/class/gpio/export ];then
+	echo 1 > /sys/class/gpio/export
+fi
+
+if [ -d /sys/class/gpio/gpio1 ];then
+	echo "out" > /sys/class/gpio/gpio1/direction
+	echo 1 > /sys/class/gpio/gpio1/value
+fi
+
+echo "networkPort=${networkPort},isUsePPP = ${isUsePPP}"
+
+
+#检测网络是否联通
+NetworkConnectedCheck(){
+	/bin/ping -c 5 $url > /dev/null 
+	if [ $? -eq 0 ];then
+		return 0 #检测网络正常
+	else
+		return 1 #检测网络连接异常
+	fi
+}
+
+#检测无线配置文件是否配置
+WirelessCfgCheck(){
+	if [ -e /etc/config/wireless ];then
+		#ssid=`/sbin/uci get wireless.ap.ApCliSsid`
+		disabled=`/sbin/uci get wireless.sta.disabled`
+		if [ $? -eq 0 ];then
+			if [ $disabled -eq 1 ];then
+				return 0
+			else 
+				ssid=`/sbin/uci get wireless.sta.ssid`
+				if [ $ssid = $wAplic0DefName ];then
+					return 0
+				else
+					return 2
+				fi
+			fi
+		else
+			return 1
+		fi
+	else
+		return 1	#返回失败
+	fi
+}
+
+#检测桥接是否连接到上级路由
+WirelessApPortCheck(){
+	ipaddr=`/sbin/ifconfig $apPort | grep "inet addr" | awk '{ print $2}' | awk -F: '{print $2}' `
+	 #WAN口没有获取到IP
+	if [ ! -n "$ipaddr" ];then
+		return 1
+	else
+		return 0
+	fi
+}
+
+#扫描周围的WIFI，并匹配是否有指定的WIFI名称
+WirelessScanSid(){
+	ssid=$1
+	/usr/sbin/iwpriv ra0 set SiteSurvey=1
+	sleep 2
+	msg=`/usr/sbin/iwpriv ra0 get_site_survey | grep $ssid`
+	if [ ! -n "$msg" ];then
+		return 1
+	else
+		return 0
+	fi
+}
+
+#监测WAN网线连接是否正常
+NetworkWanMoniter(){
+	date="`date '+%Y-%m-%d %H:%M:%S'`"
+	WanPortStatus=`/sbin/swconfig dev switch0 port ${networkPort} show | grep "link:up"`
+	#没有连接网线
+	if [ ! -n "$WanPortStatus" ];then
+		return 1
+	else
+		#有网线
+		ipaddr=`/sbin/ifconfig $wanPort | grep "inet addr" | awk '{ print $2}' | awk -F: '{print $2}' `
+		 #WAN口没有获取到IP
+		if [ ! -n "$ipaddr" ];then
+			echo "[${date}]NetworkWanMoniter restart" >>$networklog
+			/etc/init.d/network restart
+			return 2
+		else
+			#echo "[${date}] NetworkWanMoniter is connected" >>$networklog
+			return 0
+		fi
+	fi
+} 
+
+#apcli0监测
+WirelessApMonitor(){
+	date="`date '+%Y-%m-%d %H:%M:%S'`"
+	WirelessCfgCheck
+	#如果被配置
+	if [ $? -eq 2 ];then
+		WirelessApPortCheck
+		#没有获取到IP地址
+		if [ $? -eq 1 ];then
+			ssid=`/sbin/uci get wireless.sta.ssid`
+			if [ $? -eq 0 ];then
+				cnt=0
+				while [ $cnt -lt 5 ]
+				do
+					cnt=`expr $cnt+1`
+					WirelessScanSid $ssid
+					if [ $? -eq 0 ];then
+						echo "[${date}] WirelessApMonitor restart" >>$networklog
+						#重启WIFI 
+						/sbin/wifi
+						break;
+					fi
+				done
+				return 0 
+			else
+				return 2
+			fi
+		else
+			return 0
+		fi
+	else
+		return 1
+	fi
+}
+
+#日志文件大小检测
+NetworkLogFileCheck(){
+	if [ -e $networklog ];then
+		filesize=`ls -l $networklog | awk '{ print $5 }'`
+		if [ $filesize -gt $maxsize ];then
+			rm -rf $networklog
+			touch $networklog
+		fi
+	fi
+}
+
+Reset4Gmodel()
+{
+	if [ ! -d /sys/class/gpio/gpio1 ];then
+		echo 1 > /sys/class/gpio/export
+	fi
+	
+	if [ -d /sys/class/gpio/gpio1 ];then
+		echo "out" > /sys/class/gpio/gpio1/direction
+		echo 0 > /sys/class/gpio/gpio1/value
+		sleep 1
+		echo 1 > /sys/class/gpio/gpio1/value
+		sleep 10
+	fi
+}
+
+ChecSimCard()
+{
+	if [ -e /dev/ttyUSB2 ];then
+		/usr/bin/stty -F /dev/ttyUSB2 raw speed 9600 -echo min 0 time 10
+		cnt=`echo -e "AT+CCID\r\n" > /dev/ttyUSB2 | cat /dev/ttyUSB2 | grep "OK" | grep -v "grep" | wc -l`
+		echo "sim status : $cnt"
+		if [ $cnt -eq 0 ];then
+			return 0
+		fi
+		
+		return 1
+		
+	fi
+	
+	return 0
+}
+
+nwkStartPPP()
+{
+	isExit=`/sbin/ifconfig | grep "3g-ppp" | grep -v "grep"|wc -l`
+	if [ $isExit -eq 0 ];then
+		
+		#ChecSimCard
+		#if [ $? -eq 0 ];then
+		#		return 0
+		#fi
+		
+		/sbin/ifup ppp
+		let retryCnt++
+		if [ $retryCnt -gt 3 ];then
+			retryCnt = 0;
+			Reset4Gmodel
+		fi
+		return 0
+	fi
+
+	ping -s 1 -c 1 -w 50 -I 3g-ppp $dns1 >/dev/null 
+	if [ "$?" != "0" ]; then  
+		ping -s 1 -c 2 -w 50 -I 3g-ppp $dns2 
+		if [ "$?" != "0" ]; then
+			/sbin/ifdown ppp
+			Reset4Gmodel
+			/sbin/ifup ppp
+		fi
+	fi
+}
+
+nwkPPPMonitor()
+{
+	nwk_wan=$1
+	nwk_apcli0=$2
+
+	if [ $isUsePPP -eq 0 ];then
+		return 0
+	fi
+
+	if [[ $nwk_wan -eq 1 && $nwk_apcli0 -eq 1 ]] ;then
+		nwkStartPPP
+	else
+		isExit=`/sbin/ifconfig | grep "3g-ppp" | grep -v "grep"|wc -l`
+		if [ $isExit -ge 1 ];then
+			/sbin/ifdown ppp
+			/etc/init.d/network restart
+			return 0
+		fi
+	fi
+}
+
+touch $networklog
+date="`date '+%Y-%m-%d %H:%M:%S'`"
+echo "[${date}] NetworkMonitor Start!!!!" >>$networklog
+
+while true
+do 
+	#循环检测网络状态
+	NetworkWanMoniter
+	nwk_wan=$?
+	echo "nwk_wan = $nwk_wan"
+	WirelessApMonitor
+	nwk_apcli0=$?
+	echo "nwk_apcli0 = $nwk_apcli0"
+	nwkPPPMonitor $nwk_wan $nwk_apcli0
+
+	NetworkLogFileCheck
+	sleep 120 #间隔5分钟检测一次
+done
