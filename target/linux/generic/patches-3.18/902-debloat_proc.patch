@@ -34,7 +34,7 @@
  }
 --- a/fs/proc/proc_tty.c
 +++ b/fs/proc/proc_tty.c
-@@ -144,7 +144,10 @@ static const struct file_operations proc
+@@ -143,7 +143,10 @@ static const struct file_operations proc
  void proc_tty_register_driver(struct tty_driver *driver)
  {
  	struct proc_dir_entry *ent;
@@ -46,7 +46,7 @@
  	if (!driver->driver_name || driver->proc_entry ||
  	    !driver->ops->proc_fops)
  		return;
-@@ -161,6 +164,9 @@ void proc_tty_unregister_driver(struct t
+@@ -160,6 +163,9 @@ void proc_tty_unregister_driver(struct t
  {
  	struct proc_dir_entry *ent;
  
@@ -56,7 +56,7 @@
  	ent = driver->proc_entry;
  	if (!ent)
  		return;
-@@ -175,6 +181,9 @@ void proc_tty_unregister_driver(struct t
+@@ -174,6 +180,9 @@ void proc_tty_unregister_driver(struct t
   */
  void __init proc_tty_init(void)
  {
@@ -173,7 +173,7 @@
  		goto err;
 --- a/net/core/sock.c
 +++ b/net/core/sock.c
-@@ -2941,6 +2941,8 @@ static __net_initdata struct pernet_oper
+@@ -2933,6 +2933,8 @@ static __net_initdata struct pernet_oper
  
  static int __init proto_init(void)
  {
@@ -239,7 +239,7 @@
  
 --- a/net/ipv4/route.c
 +++ b/net/ipv4/route.c
-@@ -418,6 +418,9 @@ static struct pernet_operations ip_rt_pr
+@@ -416,6 +416,9 @@ static struct pernet_operations ip_rt_pr
  
  static int __init ip_rt_proc_init(void)
  {
@@ -251,7 +251,7 @@
  
 --- a/ipc/msg.c
 +++ b/ipc/msg.c
-@@ -1075,6 +1075,9 @@ void __init msg_init(void)
+@@ -1072,6 +1072,9 @@ void __init msg_init(void)
  	printk(KERN_INFO "msgmni has been set to %d\n",
  		init_ipc_ns.msg_ctlmni);
  
