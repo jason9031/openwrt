@@ -1,0 +1,4 @@
+config MT76X8_GPIO_PWM
+	tristate "MT76X8 GPIO PWM"
+	help
+	  Say Y if you want to use GPIO OUT PWM.
